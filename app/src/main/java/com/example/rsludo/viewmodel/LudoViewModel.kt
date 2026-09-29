@@ -4,10 +4,12 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.rsludo.ai.GeminiAiService
 import com.example.rsludo.audio.SoundManager
 import com.example.rsludo.data.PreferencesManager
 import com.example.rsludo.game.LudoEngine
 import com.example.rsludo.model.*
+import com.example.rsludo.online.OnlineServerManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,9 +37,12 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     val selectedMode = MutableStateFlow(GameMode.VS_AI)
     val configuredPlayers = MutableStateFlow(defaultPlayers())
 
+    val onlineServerManager = OnlineServerManager()
+
     private var aiJob: Job? = null
     private var reactionJob: Job? = null
     private var funMessageJob: Job? = null
+    private var aiCommentaryJob: Job? = null
 
     init {
         soundManager.soundEnabled = _settings.value.soundEnabled
@@ -122,6 +127,61 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         checkAiTurn()
     }
 
+    fun startOnlineGame(onlinePlayers: List<Player>) {
+        aiJob?.cancel()
+        val initialPlayers = onlinePlayers.map { config ->
+            val tokens = (0..3).map { tokenId ->
+                Token(
+                    id = tokenId,
+                    playerId = config.id,
+                    color = config.color,
+                    step = -1
+                )
+            }
+            config.copy(tokens = tokens)
+        }
+
+        _gameState.value = GameState(
+            players = initialPlayers,
+            currentPlayerIndex = 0,
+            diceValue = 1,
+            isRolling = false,
+            canRoll = true,
+            legalTokens = emptySet(),
+            consecutiveSixes = 0,
+            winner = null,
+            isPaused = false,
+            isOnlineMatch = true
+        )
+        onlineServerManager.startTurnTimer()
+    }
+
+    fun askAiMoveAdvice() {
+        val state = _gameState.value
+        val player = state.currentPlayer ?: return
+        val legalTokens = player.tokens.filter { state.legalTokens.contains(Pair(it.playerId, it.id)) }
+        if (legalTokens.isEmpty()) return
+
+        soundManager.playTokenTap()
+        viewModelScope.launch {
+            _gameState.update { it.copy(aiAdviceMessage = "AI Grandmaster analyzing board... 🧠") }
+            val (_, advice) = GeminiAiService.getStrategicMoveAdvice(state, legalTokens)
+            _gameState.update { it.copy(aiAdviceMessage = advice) }
+            delay(4500)
+            _gameState.update { it.copy(aiAdviceMessage = null) }
+        }
+    }
+
+    private fun triggerAiCommentary(event: String, player: Player, dice: Int = 1) {
+        aiCommentaryJob?.cancel()
+        aiCommentaryJob = viewModelScope.launch {
+            val commentary = GeminiAiService.getAiCommentary(event, player, dice)
+            _gameState.update { it.copy(aiCommentary = commentary) }
+            delay(3500)
+            _gameState.update { it.copy(aiCommentary = null) }
+        }
+    }
+
     fun rollDice() {
         val state = _gameState.value
         if (!state.canRoll || state.isRolling || state.winner != null || state.isPaused) return
@@ -144,6 +204,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             var funMsg: String? = null
             if (finalDice == 6) {
                 funMsg = "LUCKY 6! 🎲"
+                triggerAiCommentary("SIX", currentPlayer, 6)
             }
 
             _gameState.update {
@@ -168,7 +229,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             // Calculate legal moves
             val legalMoves = LudoEngine.findLegalMoves(currentPlayer, finalDice)
             if (legalMoves.isEmpty()) {
-                delay(900)
+                showFunMessage("NO MOVES 🚫")
+                delay(950)
                 advanceTurn()
             } else {
                 val legalSet = legalMoves.map { Pair(it.playerId, it.id) }.toSet()
@@ -252,6 +314,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         if (token.step == LudoEngine.MAX_STEP) {
             soundManager.playHome()
             showFunMessage("HOME! 🏠")
+            triggerAiCommentary("HOME", state.players.first { it.id == token.playerId }, diceValue)
             bonusTurn = true
             _gameState.update { it.copy(homeCelebrationToken = token) }
             delay(800)
@@ -263,6 +326,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         if (captured != null) {
             soundManager.playCapture()
             showFunMessage("BOOM! CAPTURE! 💥")
+            triggerAiCommentary("CAPTURE", state.players.first { it.id == token.playerId }, diceValue)
             bumpCombo()
             bonusTurn = true
 

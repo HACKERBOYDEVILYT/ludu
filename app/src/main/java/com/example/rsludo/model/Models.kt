@@ -101,7 +101,11 @@ data class GameState(
     val comboCount: Int = 0,
     val activeReaction: PlayerReaction? = null,
     val captureEffectCell: Pair<Int, Int>? = null, // row, col
-    val homeCelebrationToken: Token? = null
+    val homeCelebrationToken: Token? = null,
+    val aiCommentary: String? = null,
+    val aiAdviceMessage: String? = null,
+    val isOnlineMatch: Boolean = false,
+    val turnTimerSeconds: Int = 15
 ) {
     val currentPlayer: Player?
         get() = players.getOrNull(currentPlayerIndex)

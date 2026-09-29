@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,219 +38,233 @@ fun LudoBoardView(
     gameState: GameState,
     boardSize: Dp = 360.dp,
     onTokenClick: (Token) -> Unit = {},
+    onPlayerBaseClick: (Player) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val cellSize = boardSize / 15f
-    val tokenSize = (cellSize.value * 0.88f).dp
+    val tokenSize = (cellSize.value * 0.90f).dp
 
+    // Active player breathing pulse for their home base
+    val infiniteTransition = rememberInfiniteTransition(label = "board_active_base")
+    val activeBaseGlow by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "active_glow"
+    )
+
+    // Outer 3D Mahogany Frame with Gold Filigree Bezel
     Box(
         modifier = modifier
             .size(boardSize)
             .shadow(
-                elevation = 16.dp,
-                shape = RoundedCornerShape(18.dp),
+                elevation = 20.dp,
+                shape = RoundedCornerShape(22.dp),
                 spotColor = Color.Black
             )
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFF9F7FB))
-            .border(3.5.dp, Brush.linearGradient(listOf(RsGoldDark, RsGold, RsGoldDark)), RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        Color(0xFF3E1D0E), // Rich polished dark mahogany
+                        Color(0xFF240E04),
+                        Color(0xFF4A2412)
+                    )
+                )
+            )
+            .border(
+                width = 4.dp,
+                brush = Brush.linearGradient(
+                    listOf(RsGoldLight, Color(0xFFD4AF37), Color(0xFF7A5C1E), RsGoldLight)
+                ),
+                shape = RoundedCornerShape(22.dp)
+            )
+            .padding(4.dp)
     ) {
-        // 1. Draw Board Grid, Colors, Safe Stars, and Center Triangles
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val cellPx = size.width / 15f
+        // Inner Game Field (Canvas Rendering)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFFFAF7FC))
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val cellPx = size.width / 15f
 
-            // Background of whole board
-            drawRect(color = Color(0xFFFBF9FD))
+                // Track Floor base
+                drawRect(color = Color(0xFFF7F5FA))
 
-            // Bases (6x6 each)
-            drawRect(
-                color = LudoRed.copy(alpha = 0.95f),
-                topLeft = Offset(0f, 0f),
-                size = androidx.compose.ui.geometry.Size(cellPx * 6, cellPx * 6)
-            )
-            drawRect(
-                color = LudoGreen.copy(alpha = 0.95f),
-                topLeft = Offset(cellPx * 9, 0f),
-                size = androidx.compose.ui.geometry.Size(cellPx * 6, cellPx * 6)
-            )
-            drawRect(
-                color = LudoBlue.copy(alpha = 0.95f),
-                topLeft = Offset(0f, cellPx * 9),
-                size = androidx.compose.ui.geometry.Size(cellPx * 6, cellPx * 6)
-            )
-            drawRect(
-                color = LudoYellow.copy(alpha = 0.95f),
-                topLeft = Offset(cellPx * 9, cellPx * 9),
-                size = androidx.compose.ui.geometry.Size(cellPx * 6, cellPx * 6)
-            )
-
-            // Inner white boxes inside bases
-            drawRoundRect(
-                color = Color.White,
-                topLeft = Offset(cellPx * 0.8f, cellPx * 0.8f),
-                size = androidx.compose.ui.geometry.Size(cellPx * 4.4f, cellPx * 4.4f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
-            )
-            drawRoundRect(
-                color = Color.White,
-                topLeft = Offset(cellPx * 9.8f, cellPx * 0.8f),
-                size = androidx.compose.ui.geometry.Size(cellPx * 4.4f, cellPx * 4.4f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
-            )
-            drawRoundRect(
-                color = Color.White,
-                topLeft = Offset(cellPx * 0.8f, cellPx * 9.8f),
-                size = androidx.compose.ui.geometry.Size(cellPx * 4.4f, cellPx * 4.4f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
-            )
-            drawRoundRect(
-                color = Color.White,
-                topLeft = Offset(cellPx * 9.8f, cellPx * 9.8f),
-                size = androidx.compose.ui.geometry.Size(cellPx * 4.4f, cellPx * 4.4f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
-            )
-
-            // Home corridors (5 cells each)
-            // Red corridor (row 7, cols 1..5)
-            for (c in 1..5) {
+                // 4 Home Bases (Velvet Color fills)
                 drawRect(
                     color = LudoRed,
-                    topLeft = Offset(c * cellPx, 7 * cellPx),
-                    size = androidx.compose.ui.geometry.Size(cellPx, cellPx)
+                    topLeft = Offset(0f, 0f),
+                    size = androidx.compose.ui.geometry.Size(cellPx * 6, cellPx * 6)
                 )
-            }
-            // Green corridor (col 7, rows 1..5)
-            for (r in 1..5) {
                 drawRect(
                     color = LudoGreen,
-                    topLeft = Offset(7 * cellPx, r * cellPx),
-                    size = androidx.compose.ui.geometry.Size(cellPx, cellPx)
+                    topLeft = Offset(cellPx * 9, 0f),
+                    size = androidx.compose.ui.geometry.Size(cellPx * 6, cellPx * 6)
                 )
-            }
-            // Yellow corridor (row 7, cols 9..13)
-            for (c in 9..13) {
-                drawRect(
-                    color = LudoYellow,
-                    topLeft = Offset(c * cellPx, 7 * cellPx),
-                    size = androidx.compose.ui.geometry.Size(cellPx, cellPx)
-                )
-            }
-            // Blue corridor (col 7, rows 9..13)
-            for (r in 9..13) {
                 drawRect(
                     color = LudoBlue,
-                    topLeft = Offset(7 * cellPx, r * cellPx),
-                    size = androidx.compose.ui.geometry.Size(cellPx, cellPx)
+                    topLeft = Offset(0f, cellPx * 9),
+                    size = androidx.compose.ui.geometry.Size(cellPx * 6, cellPx * 6)
                 )
+                drawRect(
+                    color = LudoYellow,
+                    topLeft = Offset(cellPx * 9, cellPx * 9),
+                    size = androidx.compose.ui.geometry.Size(cellPx * 6, cellPx * 6)
+                )
+
+                // Inner Ivory Pillows inside bases
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(cellPx * 0.75f, cellPx * 0.75f),
+                    size = androidx.compose.ui.geometry.Size(cellPx * 4.5f, cellPx * 4.5f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f)
+                )
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(cellPx * 9.75f, cellPx * 0.75f),
+                    size = androidx.compose.ui.geometry.Size(cellPx * 4.5f, cellPx * 4.5f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f)
+                )
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(cellPx * 0.75f, cellPx * 9.75f),
+                    size = androidx.compose.ui.geometry.Size(cellPx * 4.5f, cellPx * 4.5f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f)
+                )
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(cellPx * 9.75f, cellPx * 9.75f),
+                    size = androidx.compose.ui.geometry.Size(cellPx * 4.5f, cellPx * 4.5f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f)
+                )
+
+                // 4 Home Stretch Corridors
+                // Red corridor (row 7, cols 1..5)
+                for (c in 1..5) {
+                    drawRect(
+                        color = LudoRed,
+                        topLeft = Offset(c * cellPx, 7 * cellPx),
+                        size = androidx.compose.ui.geometry.Size(cellPx, cellPx)
+                    )
+                }
+                // Green corridor (col 7, rows 1..5)
+                for (r in 1..5) {
+                    drawRect(
+                        color = LudoGreen,
+                        topLeft = Offset(7 * cellPx, r * cellPx),
+                        size = androidx.compose.ui.geometry.Size(cellPx, cellPx)
+                    )
+                }
+                // Yellow corridor (row 7, cols 9..13)
+                for (c in 9..13) {
+                    drawRect(
+                        color = LudoYellow,
+                        topLeft = Offset(c * cellPx, 7 * cellPx),
+                        size = androidx.compose.ui.geometry.Size(cellPx, cellPx)
+                    )
+                }
+                // Blue corridor (col 7, rows 9..13)
+                for (r in 9..13) {
+                    drawRect(
+                        color = LudoBlue,
+                        topLeft = Offset(7 * cellPx, r * cellPx),
+                        size = androidx.compose.ui.geometry.Size(cellPx, cellPx)
+                    )
+                }
+
+                // 4 Starting Blocks
+                drawRect(color = LudoRed, topLeft = Offset(1 * cellPx, 6 * cellPx), size = androidx.compose.ui.geometry.Size(cellPx, cellPx))
+                drawRect(color = LudoGreen, topLeft = Offset(8 * cellPx, 1 * cellPx), size = androidx.compose.ui.geometry.Size(cellPx, cellPx))
+                drawRect(color = LudoYellow, topLeft = Offset(13 * cellPx, 8 * cellPx), size = androidx.compose.ui.geometry.Size(cellPx, cellPx))
+                drawRect(color = LudoBlue, topLeft = Offset(6 * cellPx, 13 * cellPx), size = androidx.compose.ui.geometry.Size(cellPx, cellPx))
+
+                // Center Home Triangles (rows 6..8, cols 6..8)
+                val cLeft = 6 * cellPx
+                val cTop = 6 * cellPx
+                val cRight = 9 * cellPx
+                val cBottom = 9 * cellPx
+                val midX = 7.5f * cellPx
+                val midY = 7.5f * cellPx
+
+                // Red triangle (Left)
+                drawPath(Path().apply {
+                    moveTo(cLeft, cTop)
+                    lineTo(midX, midY)
+                    lineTo(cLeft, cBottom)
+                    close()
+                }, LudoRed)
+
+                // Green triangle (Top)
+                drawPath(Path().apply {
+                    moveTo(cLeft, cTop)
+                    lineTo(cRight, cTop)
+                    lineTo(midX, midY)
+                    close()
+                }, LudoGreen)
+
+                // Yellow triangle (Right)
+                drawPath(Path().apply {
+                    moveTo(cRight, cTop)
+                    lineTo(cRight, cBottom)
+                    lineTo(midX, midY)
+                    close()
+                }, LudoYellow)
+
+                // Blue triangle (Bottom)
+                drawPath(Path().apply {
+                    moveTo(cLeft, cBottom)
+                    lineTo(midX, midY)
+                    lineTo(cRight, cBottom)
+                    close()
+                }, LudoBlue)
+
+                // Track Cell borders (Beveled Wood/Brass Gridlines)
+                val gridColor = Color(0xFFC7BED6)
+                for (i in 0..15) {
+                    drawLine(gridColor, Offset(6 * cellPx, i * cellPx), Offset(9 * cellPx, i * cellPx), 1.5f)
+                    drawLine(gridColor, Offset(0f, i * cellPx), Offset(6 * cellPx, i * cellPx), 1.5f)
+                    drawLine(gridColor, Offset(9 * cellPx, i * cellPx), Offset(15 * cellPx, i * cellPx), 1.5f)
+
+                    drawLine(gridColor, Offset(i * cellPx, 6 * cellPx), Offset(i * cellPx, 9 * cellPx), 1.5f)
+                    drawLine(gridColor, Offset(i * cellPx, 0f), Offset(i * cellPx, 6 * cellPx), 1.5f)
+                    drawLine(gridColor, Offset(i * cellPx, 9 * cellPx), Offset(i * cellPx, 15 * cellPx), 1.5f)
+                }
             }
 
-            // Start cells
-            // Red start: row 6, col 1
-            drawRect(color = LudoRed, topLeft = Offset(1 * cellPx, 6 * cellPx), size = androidx.compose.ui.geometry.Size(cellPx, cellPx))
-            // Green start: row 1, col 8
-            drawRect(color = LudoGreen, topLeft = Offset(8 * cellPx, 1 * cellPx), size = androidx.compose.ui.geometry.Size(cellPx, cellPx))
-            // Yellow start: row 8, col 13
-            drawRect(color = LudoYellow, topLeft = Offset(13 * cellPx, 8 * cellPx), size = androidx.compose.ui.geometry.Size(cellPx, cellPx))
-            // Blue start: row 13, col 6
-            drawRect(color = LudoBlue, topLeft = Offset(6 * cellPx, 13 * cellPx), size = androidx.compose.ui.geometry.Size(cellPx, cellPx))
+            // 3D Star Medallions on 8 Safe Cells
+            SafeStarsOverlay(cellSize = cellSize)
 
-            // Center Home Triangle (rows 6..8, cols 6..8)
-            val centerLeft = 6 * cellPx
-            val centerTop = 6 * cellPx
-            val centerRight = 9 * cellPx
-            val centerBottom = 9 * cellPx
-            val midX = 7.5f * cellPx
-            val midY = 7.5f * cellPx
+            // Base Token Slots & Player Base Avatars
+            HomeBaseAvatarsAndSlots(
+                gameState = gameState,
+                cellSize = cellSize,
+                activeGlow = activeBaseGlow,
+                onPlayerBaseClick = onPlayerBaseClick
+            )
 
-            // Red triangle (Left)
-            val redPath = Path().apply {
-                moveTo(centerLeft, centerTop)
-                lineTo(midX, midY)
-                lineTo(centerLeft, centerBottom)
-                close()
-            }
-            drawPath(redPath, LudoRed)
+            // Center Royal 3D Crown Victory Pedestal
+            CenterRoyalPedestal(cellSize = cellSize)
 
-            // Green triangle (Top)
-            val greenPath = Path().apply {
-                moveTo(centerLeft, centerTop)
-                lineTo(centerRight, centerTop)
-                lineTo(midX, midY)
-                close()
-            }
-            drawPath(greenPath, LudoGreen)
-
-            // Yellow triangle (Right)
-            val yellowPath = Path().apply {
-                moveTo(centerRight, centerTop)
-                lineTo(centerRight, centerBottom)
-                lineTo(midX, midY)
-                close()
-            }
-            drawPath(yellowPath, LudoYellow)
-
-            // Blue triangle (Bottom)
-            val bluePath = Path().apply {
-                moveTo(centerLeft, centerBottom)
-                lineTo(midX, midY)
-                lineTo(centerRight, centerBottom)
-                close()
-            }
-            drawPath(bluePath, LudoBlue)
-
-            // Track Cell grid borders (horizontal and vertical arms)
-            val gridColor = Color(0xFFD6CFE0)
-            for (i in 0..15) {
-                // Horizontal lines across arm sections
-                drawLine(gridColor, Offset(6 * cellPx, i * cellPx), Offset(9 * cellPx, i * cellPx), 1.2f)
-                drawLine(gridColor, Offset(0f, i * cellPx), Offset(6 * cellPx, i * cellPx), 1.2f)
-                drawLine(gridColor, Offset(9 * cellPx, i * cellPx), Offset(15 * cellPx, i * cellPx), 1.2f)
-
-                // Vertical lines across arm sections
-                drawLine(gridColor, Offset(i * cellPx, 6 * cellPx), Offset(i * cellPx, 9 * cellPx), 1.2f)
-                drawLine(gridColor, Offset(i * cellPx, 0f), Offset(i * cellPx, 6 * cellPx), 1.2f)
-                drawLine(gridColor, Offset(i * cellPx, 9 * cellPx), Offset(i * cellPx, 15 * cellPx), 1.2f)
-            }
-        }
-
-        // 2. Safe Stars decoration overlay
-        SafeStarsOverlay(cellSize = cellSize)
-
-        // 3. Base circular token spots & player base avatars
-        HomeBaseAvatarsAndSlots(gameState = gameState, cellSize = cellSize)
-
-        // 4. Center RS emblem inside the home triangle
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .offset(x = cellSize * 6.75f, y = cellSize * 6.75f)
-                .size(cellSize * 1.5f)
-                .shadow(6.dp, CircleShape)
-                .clip(CircleShape)
-                .background(Brush.radialGradient(listOf(RsGoldLight, RsGoldDark)))
-                .border(1.5.dp, Color.White, CircleShape)
-        ) {
-            Text(
-                text = "RS",
-                fontSize = (cellSize.value * 0.52f).sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF1E0E32)
+            // Active Interactive 3D Tokens Layer
+            TokensOverlay(
+                gameState = gameState,
+                cellSize = cellSize,
+                tokenSize = tokenSize,
+                onTokenClick = onTokenClick
             )
         }
-
-        // 5. Render active tokens on the board
-        TokensOverlay(
-            gameState = gameState,
-            cellSize = cellSize,
-            tokenSize = tokenSize,
-            onTokenClick = onTokenClick
-        )
     }
 }
 
 @Composable
 private fun SafeStarsOverlay(cellSize: Dp) {
-    // 8 Safe Cells
     val safePositions = listOf(
         Pair(6, 1),  // Red Start
         Pair(2, 6),  // Safe Star 1
@@ -268,37 +283,102 @@ private fun SafeStarsOverlay(cellSize: Dp) {
                 .offset(x = cellSize * pos.second, y = cellSize * pos.first)
                 .size(cellSize)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = "Safe Cell",
-                tint = StarGold,
-                modifier = Modifier.size(cellSize * 0.65f)
+            // 3D Brass Medallion behind star
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(cellSize * 0.76f)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(Color(0xFFFFF176), Color(0xFFFFB300), Color(0xFFC78100))
+                        )
+                    )
+                    .border(1.dp, Color.White, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Safe Star",
+                    tint = Color(0xFF5D4037),
+                    modifier = Modifier.size(cellSize * 0.52f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CenterRoyalPedestal(cellSize: Dp) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .offset(x = cellSize * 6.6f, y = cellSize * 6.6f)
+            .size(cellSize * 1.8f)
+            .shadow(10.dp, CircleShape, spotColor = RsGold)
+            .clip(CircleShape)
+            .background(
+                Brush.radialGradient(
+                    listOf(
+                        RsGoldLight,
+                        RsGold,
+                        Color(0xFF996515),
+                        Color(0xFF4A3205)
+                    )
+                )
+            )
+            .border(2.5.dp, Color.White, CircleShape)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(text = "👑", fontSize = (cellSize.value * 0.55f).sp)
+            Text(
+                text = "RS",
+                fontSize = (cellSize.value * 0.38f).sp,
+                fontWeight = FontWeight.Black,
+                color = Color(0xFF251201)
             )
         }
     }
 }
 
 @Composable
-private fun HomeBaseAvatarsAndSlots(gameState: GameState, cellSize: Dp) {
+private fun HomeBaseAvatarsAndSlots(
+    gameState: GameState,
+    cellSize: Dp,
+    activeGlow: Float,
+    onPlayerBaseClick: (Player) -> Unit = {}
+) {
     val playersByColor = gameState.players.associateBy { it.color }
 
     val baseConfigs = listOf(
-        Triple(PlayerColor.RED, 0.8f, 0.8f),
-        Triple(PlayerColor.GREEN, 9.8f, 0.8f),
-        Triple(PlayerColor.BLUE, 0.8f, 9.8f),
-        Triple(PlayerColor.YELLOW, 9.8f, 9.8f)
+        Triple(PlayerColor.RED, 0.75f, 0.75f),
+        Triple(PlayerColor.GREEN, 9.75f, 0.75f),
+        Triple(PlayerColor.BLUE, 0.75f, 9.75f),
+        Triple(PlayerColor.YELLOW, 9.75f, 9.75f)
     )
 
     for ((color, leftCol, topRow) in baseConfigs) {
         val player = playersByColor[color]
+        val isActive = gameState.currentPlayer?.color == color
 
         Box(
             modifier = Modifier
                 .offset(x = cellSize * leftCol, y = cellSize * topRow)
-                .size(cellSize * 4.4f)
+                .size(cellSize * 4.5f)
+                .clip(RoundedCornerShape(16.dp))
+                .border(
+                    width = if (isActive) (2.5.dp * activeGlow) else 1.5.dp,
+                    color = if (isActive) RsGold else color.light,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .clickable {
+                    if (player != null) onPlayerBaseClick(player)
+                }
                 .padding(4.dp)
         ) {
-            // Player label and small avatar in center of base
+            // Player label and small photo avatar in center of base
             if (player != null) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -309,8 +389,8 @@ private fun HomeBaseAvatarsAndSlots(gameState: GameState, cellSize: Dp) {
                         color = color,
                         avatarUri = player.avatarUri,
                         isAi = player.isAi,
-                        size = cellSize * 1.3f,
-                        isActive = gameState.currentPlayer?.color == color
+                        size = cellSize * 1.35f,
+                        isActive = isActive
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -322,12 +402,12 @@ private fun HomeBaseAvatarsAndSlots(gameState: GameState, cellSize: Dp) {
                 }
             }
 
-            // 4 circular token slots
+            // 4 circular token slots with brass rings
             val slotPositions = listOf(
-                Pair(cellSize * 0.2f, cellSize * 0.2f),
-                Pair(cellSize * 2.3f, cellSize * 0.2f),
-                Pair(cellSize * 0.2f, cellSize * 2.3f),
-                Pair(cellSize * 2.3f, cellSize * 2.3f)
+                Pair(cellSize * 0.25f, cellSize * 0.25f),
+                Pair(cellSize * 2.35f, cellSize * 0.25f),
+                Pair(cellSize * 0.25f, cellSize * 2.35f),
+                Pair(cellSize * 2.35f, cellSize * 2.35f)
             )
 
             for ((sx, sy) in slotPositions) {
@@ -337,7 +417,11 @@ private fun HomeBaseAvatarsAndSlots(gameState: GameState, cellSize: Dp) {
                         .size(cellSize * 1.5f)
                         .clip(CircleShape)
                         .background(color.light.copy(alpha = 0.25f))
-                        .border(1.2.dp, color.primary, CircleShape)
+                        .border(
+                            1.5.dp,
+                            Brush.linearGradient(listOf(RsGoldLight, color.primary)),
+                            CircleShape
+                        )
                 )
             }
         }
@@ -352,8 +436,6 @@ private fun TokensOverlay(
     onTokenClick: (Token) -> Unit
 ) {
     val playersByColor = gameState.players.associateBy { it.color }
-
-    // Group tokens by their board coordinate to prevent overlapping
     val allTokens = gameState.players.flatMap { it.tokens }
 
     for (token in allTokens) {
@@ -363,9 +445,24 @@ private fun TokensOverlay(
 
         val (row, col) = LudoBoardCoordinates.getCoordinatesForStep(token.color, token.step, token.id)
 
-        // Calculate smooth position
-        val targetX = cellSize * col + (cellSize - tokenSize) / 2
-        val targetY = cellSize * row + (cellSize - tokenSize) / 2
+        // Micro-offsets for tokens sharing the exact same cell on the track
+        val (stackOffsetX, stackOffsetY) = if (token.step != -1) {
+            val cellTokens = allTokens.filter {
+                it.step != -1 && LudoBoardCoordinates.getCoordinatesForStep(it.color, it.step, it.id) == Pair(row, col)
+            }
+            val indexInCell = cellTokens.indexOf(token)
+            if (cellTokens.size > 1) {
+                when (indexInCell % 4) {
+                    0 -> Pair((-cellSize * 0.14f), (-cellSize * 0.14f))
+                    1 -> Pair((cellSize * 0.14f), (cellSize * 0.14f))
+                    2 -> Pair((cellSize * 0.14f), (-cellSize * 0.14f))
+                    else -> Pair((-cellSize * 0.14f), (cellSize * 0.14f))
+                }
+            } else Pair(0.dp, 0.dp)
+        } else Pair(0.dp, 0.dp)
+
+        val targetX = cellSize * col + (cellSize - tokenSize) / 2 + stackOffsetX
+        val targetY = cellSize * row + (cellSize - tokenSize) / 2 + stackOffsetY
 
         val animX by animateDpAsState(
             targetValue = targetX,

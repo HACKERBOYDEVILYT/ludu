@@ -13,7 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.rsludo.model.AiDifficulty
 import com.example.rsludo.model.GameMode
+import com.example.rsludo.model.Player
 import com.example.rsludo.model.PlayerColor
+import com.example.rsludo.online.OnlinePlayer
 import com.example.rsludo.ui.screens.*
 import com.example.rsludo.viewmodel.LudoViewModel
 import com.example.ui.theme.RSLudoTheme
@@ -23,6 +25,7 @@ enum class AppScreen {
     SPLASH,
     HOME,
     PLAYER_SETUP,
+    ONLINE_LOBBY,
     GAME,
     STATISTICS,
     SETTINGS
@@ -49,6 +52,7 @@ class MainActivity : ComponentActivity() {
                     val statistics by viewModel.statistics.collectAsStateWithLifecycle()
                     val players by viewModel.configuredPlayers.collectAsStateWithLifecycle()
                     val selectedMode by viewModel.selectedMode.collectAsStateWithLifecycle()
+                    val onlineState by viewModel.onlineServerManager.state.collectAsStateWithLifecycle()
 
                     AnimatedContent(
                         targetState = currentScreen,
@@ -68,7 +72,23 @@ class MainActivity : ComponentActivity() {
 
                             AppScreen.HOME -> {
                                 HomeScreen(
+                                    player = players.firstOrNull(),
                                     statistics = statistics,
+                                    soundEnabled = settings.soundEnabled,
+                                    onSoundToggle = {
+                                        viewModel.updateSettings(
+                                            settings.copy(soundEnabled = !settings.soundEnabled)
+                                        )
+                                    },
+                                    onBonusClaimed = {
+                                        viewModel.soundManager.playHome()
+                                    },
+                                    onAvatarChange = { uri ->
+                                        viewModel.setPlayerAvatar("p1", android.net.Uri.parse(uri))
+                                    },
+                                    onNameChange = { name ->
+                                        viewModel.updatePlayerConfig(0) { it.copy(name = name) }
+                                    },
                                     onPlayClick = { mode ->
                                         viewModel.selectedMode.value = mode
                                         if (mode == GameMode.VS_AI) {
@@ -82,6 +102,9 @@ class MainActivity : ComponentActivity() {
                                         }
                                         viewModel.startNewGame()
                                         currentScreen = AppScreen.GAME
+                                    },
+                                    onPlayOnlineClick = {
+                                        currentScreen = AppScreen.ONLINE_LOBBY
                                     },
                                     onPlayerSetupClick = {
                                         currentScreen = AppScreen.PLAYER_SETUP
@@ -121,6 +144,45 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            AppScreen.ONLINE_LOBBY -> {
+                                val localP = players.firstOrNull() ?: Player("p1", "Player 1", PlayerColor.RED)
+                                OnlineLobbyScreen(
+                                    localPlayer = localP,
+                                    onlineState = onlineState,
+                                    onQuickMatch = {
+                                        viewModel.onlineServerManager.quickMatch(localP) { matched ->
+                                            viewModel.startOnlineGame(matched)
+                                            currentScreen = AppScreen.GAME
+                                        }
+                                    },
+                                    onCreateRoom = {
+                                        viewModel.onlineServerManager.createPrivateRoom(localP)
+                                    },
+                                    onJoinRoom = { code ->
+                                        viewModel.onlineServerManager.joinPrivateRoom(code, localP) { isJoined ->
+                                            if (isJoined) {
+                                                val currentOnline = viewModel.onlineServerManager.state.value.players.map { op ->
+                                                    Player(op.id, op.name, op.color, op.avatarUri)
+                                                }
+                                                viewModel.startOnlineGame(currentOnline)
+                                                currentScreen = AppScreen.GAME
+                                            }
+                                        }
+                                    },
+                                    onStartMatch = {
+                                        val currentOnline = viewModel.onlineServerManager.state.value.players.map { op ->
+                                            Player(op.id, op.name, op.color, op.avatarUri)
+                                        }
+                                        viewModel.startOnlineGame(currentOnline)
+                                        currentScreen = AppScreen.GAME
+                                    },
+                                    onBack = {
+                                        viewModel.onlineServerManager.leaveRoom()
+                                        currentScreen = AppScreen.HOME
+                                    }
+                                )
+                            }
+
                             AppScreen.GAME -> {
                                 GameScreen(
                                     gameState = gameState,
@@ -139,6 +201,9 @@ class MainActivity : ComponentActivity() {
                                     onSendReaction = { emoji, label ->
                                         viewModel.sendReaction(emoji, label)
                                     },
+                                    onAskAiAdvice = {
+                                        viewModel.askAiMoveAdvice()
+                                    },
                                     onPauseClick = {
                                         viewModel.togglePause(true)
                                     },
@@ -153,12 +218,14 @@ class MainActivity : ComponentActivity() {
                                         if (settings.confirmExit && gameState.winner == null) {
                                             viewModel.setExitConfirm(true)
                                         } else {
+                                            viewModel.onlineServerManager.leaveRoom()
                                             currentScreen = AppScreen.HOME
                                         }
                                     },
                                     onConfirmLeave = {
                                         viewModel.setExitConfirm(false)
                                         viewModel.togglePause(false)
+                                        viewModel.onlineServerManager.leaveRoom()
                                         currentScreen = AppScreen.HOME
                                     },
                                     onDismissLeave = {
