@@ -56,6 +56,7 @@ fun HomeScreen(
     onBonusClaimed: () -> Unit = {},
     onAvatarChange: ((String) -> Unit)? = null,
     onNameChange: ((String) -> Unit)? = null,
+    onOpenAdminClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showPlayerSelectDialog by remember { mutableStateOf(false) }
@@ -134,7 +135,8 @@ fun HomeScreen(
                 soundEnabled = soundEnabled,
                 onSoundToggle = onSoundToggle,
                 onPlayerProfileClick = { showProfileDialog = true },
-                onSettingsClick = onSettingsClick
+                onSettingsClick = onSettingsClick,
+                onOpenAdminClick = onOpenAdminClick
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -379,7 +381,8 @@ private fun LudoKingTopBar(
     soundEnabled: Boolean,
     onSoundToggle: () -> Unit,
     onPlayerProfileClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onOpenAdminClick: () -> Unit = {}
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -507,6 +510,22 @@ private fun LudoKingTopBar(
                     imageVector = Icons.Filled.Settings,
                     contentDescription = "Settings",
                     tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onOpenAdminClick,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1B2C69))
+                    .border(1.2.dp, RsGold, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AdminPanelSettings,
+                    contentDescription = "Admin Console",
+                    tint = RsGold,
                     modifier = Modifier.size(20.dp)
                 )
             }

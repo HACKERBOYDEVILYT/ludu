@@ -28,7 +28,8 @@ enum class AppScreen {
     ONLINE_LOBBY,
     GAME,
     STATISTICS,
-    SETTINGS
+    SETTINGS,
+    ADMIN_DASHBOARD
 }
 
 class MainActivity : ComponentActivity() {
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
                     val players by viewModel.configuredPlayers.collectAsStateWithLifecycle()
                     val selectedMode by viewModel.selectedMode.collectAsStateWithLifecycle()
                     val onlineState by viewModel.onlineServerManager.state.collectAsStateWithLifecycle()
+                    val adminState by viewModel.adminManager.state.collectAsStateWithLifecycle()
 
                     AnimatedContent(
                         targetState = currentScreen,
@@ -114,6 +116,9 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onSettingsClick = {
                                         currentScreen = AppScreen.SETTINGS
+                                    },
+                                    onOpenAdminClick = {
+                                        currentScreen = AppScreen.ADMIN_DASHBOARD
                                     }
                                 )
                             }
@@ -255,8 +260,50 @@ class MainActivity : ComponentActivity() {
                                     onSettingsChanged = { updated ->
                                         viewModel.updateSettings(updated)
                                     },
+                                    onOpenAdminClick = {
+                                        currentScreen = AppScreen.ADMIN_DASHBOARD
+                                    },
                                     onBack = {
                                         currentScreen = AppScreen.HOME
+                                    }
+                                )
+                            }
+
+                            AppScreen.ADMIN_DASHBOARD -> {
+                                AdminDashboardScreen(
+                                    adminState = adminState,
+                                    onAuthenticate = { pin ->
+                                        viewModel.adminManager.authenticate(pin)
+                                    },
+                                    onLogout = {
+                                        viewModel.adminManager.logout()
+                                    },
+                                    onToggleMaintenance = { enabled ->
+                                        viewModel.adminManager.toggleMaintenance(enabled)
+                                    },
+                                    onSetDiceRigMode = { mode ->
+                                        viewModel.adminManager.setDiceRigMode(mode)
+                                    },
+                                    onSetDailyBonusCoins = { coins ->
+                                        viewModel.adminManager.setDailyBonusCoins(coins)
+                                    },
+                                    onSetMatchWinRewardCoins = { reward ->
+                                        viewModel.adminManager.setMatchWinRewardCoins(reward)
+                                    },
+                                    onUpdatePlayerCoins = { id, delta ->
+                                        viewModel.adminManager.updatePlayerCoins(id, delta)
+                                    },
+                                    onSetPlayerVip = { id, vip ->
+                                        viewModel.adminManager.setPlayerVip(id, vip)
+                                    },
+                                    onTogglePlayerBan = { id ->
+                                        viewModel.adminManager.togglePlayerBan(id)
+                                    },
+                                    onClearLogs = {
+                                        viewModel.adminManager.clearAuditLogs()
+                                    },
+                                    onBack = {
+                                        currentScreen = AppScreen.SETTINGS
                                     }
                                 )
                             }

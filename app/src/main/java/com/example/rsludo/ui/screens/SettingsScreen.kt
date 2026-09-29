@@ -2,6 +2,7 @@ package com.example.rsludo.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +29,7 @@ import com.example.ui.theme.*
 fun SettingsScreen(
     settings: GameSettings,
     onSettingsChanged: (GameSettings) -> Unit,
+    onOpenAdminClick: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -114,7 +116,64 @@ fun SettingsScreen(
             onCheckedChange = { onSettingsChanged(settings.copy(confirmExit = it)) }
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Operator Access Card
+        SectionTitle("OPERATOR ACCESS")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF0F172A))
+                .border(1.5.dp, RsGold, RoundedCornerShape(16.dp))
+                .clickable(onClick = onOpenAdminClick)
+                .padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1E293B))
+                            .border(1.dp, RsGold, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AdminPanelSettings,
+                            contentDescription = null,
+                            tint = RsGold,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "ADMIN CONTROL PANEL",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            color = RsGold
+                        )
+                        Text(
+                            text = "RNG dice rigging, server health & player management",
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = RsGold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
 
         // About Card
         Box(

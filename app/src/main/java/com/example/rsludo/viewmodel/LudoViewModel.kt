@@ -4,6 +4,8 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.rsludo.admin.AdminManager
+import com.example.rsludo.admin.DiceRigMode
 import com.example.rsludo.ai.GeminiAiService
 import com.example.rsludo.audio.SoundManager
 import com.example.rsludo.data.PreferencesManager
@@ -38,6 +40,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     val configuredPlayers = MutableStateFlow(defaultPlayers())
 
     val onlineServerManager = OnlineServerManager()
+    val adminManager = AdminManager(application)
 
     private var aiJob: Job? = null
     private var reactionJob: Job? = null
@@ -198,7 +201,13 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 delay(60)
             }
 
-            val finalDice = Random.nextInt(1, 7)
+            val rigMode = adminManager.state.value.diceRigMode
+            val finalDice = when (rigMode) {
+                DiceRigMode.FORCE_SIX -> 6
+                DiceRigMode.LUCKY_SIX_BOOST -> if (Random.nextFloat() < 0.35f) 6 else Random.nextInt(1, 7)
+                DiceRigMode.HIGH_ROLLS -> Random.nextInt(4, 7)
+                DiceRigMode.FAIR -> Random.nextInt(1, 7)
+            }
             val newSixCount = if (finalDice == 6) state.consecutiveSixes + 1 else 0
 
             var funMsg: String? = null
