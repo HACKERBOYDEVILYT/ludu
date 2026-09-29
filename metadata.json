@@ -1,0 +1,6 @@
+{
+  "name": "RS Ludo",
+  "description": "RS Ludo - Premium Ludo Game with Custom Photo Avatars, Smart AI, and Rich Audio",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
